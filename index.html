@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#141127">
+  <title>秘印翻牌</title>
+  <style>
+    :root {
+      color: #f1e6c9;
+      font-family: "Noto Serif TC", "PMingLiU", "Songti TC", serif;
+      background: #141127;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100svh;
+      background:
+        radial-gradient(circle at 50% 28%, #3c2c54 0%, transparent 55%),
+        radial-gradient(circle at 1px 1px, #e4bf7829 1px, transparent 1.5px) 0 0 / 37px 37px,
+        linear-gradient(155deg, #211936, #100e1d 75%);
+    }
+    main {
+      width: min(100%, 33rem);
+      margin: auto;
+      padding: clamp(1rem, 4vh, 2.25rem) 1.25rem 1.5rem;
+      text-align: center;
+    }
+    h1 {
+      margin: 0;
+      color: #f5d99e;
+      font-size: clamp(2.1rem, 7vw, 3.25rem);
+      letter-spacing: .16em;
+      padding-left: .16em;
+      text-shadow: 0 4px 20px #080612ad;
+    }
+    .instructions { margin: .55rem 0 1rem; color: #dcd0e6; }
+    .score {
+      display: inline-block;
+      margin: 0 0 1rem;
+      padding: .4rem 1rem;
+      border-radius: 2rem;
+      border: 1px solid #b99158;
+      background: #211831;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: clamp(.45rem, 2vw, .75rem);
+      max-width: min(22rem, max(14rem, calc((100svh - 13.5rem) * .75)));
+      margin: auto;
+    }
+    button { font: inherit; cursor: pointer; touch-action: manipulation; }
+    button:focus-visible { outline: 2px solid #f8e2a8; outline-offset: 3px; }
+    .card {
+      position: relative;
+      min-width: 0;
+      aspect-ratio: 3 / 4;
+      padding: 0;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      perspective: 600px;
+    }
+    .faces {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      transform-style: preserve-3d;
+      transition: transform 220ms ease;
+      box-shadow: 0 2px 2px #080611, 0 6px 13px #08061170;
+    }
+    .card.open .faces { transform: rotateY(180deg); }
+    .face {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border: 1px solid #b99158;
+      border-radius: inherit;
+      backface-visibility: hidden;
+      user-select: none;
+    }
+    .back {
+      background: radial-gradient(circle, #3d2a58, #201732 80%);
+    }
+    .face::before {
+      content: "";
+      position: absolute;
+      inset: 4px;
+      border: 1px solid currentColor;
+      border-radius: 5px;
+      opacity: .48;
+      pointer-events: none;
+    }
+    .back img { width: 90%; }
+    .card:hover:not(.open) .back { background: radial-gradient(circle, #513769, #271b3b 80%); }
+    .front {
+      color: #593d42;
+      background: radial-gradient(ellipse, #fff5d8, #e8c891);
+      transform: rotateY(180deg);
+      grid-template-rows: minmax(0, 1fr) auto;
+      padding: 7% 7% 12%;
+      font-size: clamp(.625rem, 2.5vw, .8rem);
+      font-weight: 700;
+      letter-spacing: .08em;
+    }
+    .front img { width: 100%; height: 100%; object-fit: contain; min-height: 0; }
+    .matched { cursor: default; }
+    .matched .front { border-color: #ffde8b; box-shadow: 0 0 10px #f3c96866; }
+    .action {
+      padding: .5rem 1rem;
+      border: 1px solid #b99158;
+      border-radius: 2rem;
+      background: #2d2141;
+      color: #f5d99e;
+      font-weight: 800;
+    }
+    #restart { margin-top: 1.15rem; }
+    dialog {
+      width: min(calc(100% - 2rem), 22rem);
+      padding: 1.8rem 1.4rem;
+      border: 1px solid #d8af6e;
+      border-radius: 22px;
+      color: inherit;
+      background: #291e3d;
+      text-align: center;
+      box-shadow: 0 18px 48px #123b4d44;
+    }
+    dialog::backdrop { background: #100b1bba; }
+    dialog h2 { margin: 0 0 .5rem; color: #f5d99e; font-size: 1.85rem; }
+    dialog p { margin: 0 0 1rem; }
+    dialog form { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem; }
+    @media (prefers-reduced-motion: reduce) {
+      .faces { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>秘印翻牌</h1>
+    <p class="instructions">翻開兩張牌，找出相同的象徵。</p>
+    <p class="score" role="status">得分 <span id="score">0</span> / 8</p>
+    <div class="board" id="board" role="group" aria-label="翻牌區"></div>
+    <button class="action" id="restart" type="button">重新洗牌</button>
+  </main>
+
+  <dialog id="complete" aria-labelledby="complete-title">
+    <h2 id="complete-title">感謝遊玩~</h2>
+    <p>你找到了全部 8 對圖案！</p>
+    <form method="dialog">
+      <button class="action" value="close" autofocus>關閉</button>
+      <button class="action" id="replay" value="replay" type="button">再玩一次</button>
+    </form>
+  </dialog>
+
+  <script>
+    function drawImage(outline, ink, filled = '') {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 200;
+      const art = canvas.getContext('2d');
+      art.scale(2, 2);
+      art.strokeStyle = art.fillStyle = ink;
+      art.lineWidth = 2;
+      art.lineJoin = art.lineCap = 'round';
+      art.stroke(new Path2D(outline));
+      if (filled) art.fill(new Path2D(filled));
+      return canvas.toDataURL();
+    }
+
+    const gold = '#8d5a31';
+    const pictures = [
+      ['太陽', 'M50 31a19 19 0 1 0 0 38a19 19 0 1 0 0-38 M50 12v10 M50 78v10 M12 50h10 M78 50h10 M23 23l7 7 M70 70l7 7 M77 23l-7 7 M30 70l-7 7'],
+      ['天平', 'M50 24v53 M35 78h30 M23 36q27 8 54 0 M21 56l8-17 8 17z M63 56l8-17 8 17z M21 56q8 13 16 0 M63 56q8 13 16 0 M50 17l4 4-4 4-4-4z'],
+      ['新月', 'M62 19a34 34 0 1 0 19 47A29 29 0 0 1 62 19z M74 27v16 M66 35h16 M84 46v8 M80 50h8'],
+      ['星辰', 'M50 15l7 27 28 8-28 8-7 27-7-27-28-8 28-8z M28 24l7 11 M75 24l-10 11 M25 75l10-10 M75 75l-10-10'],
+      ['聖杯', 'M25 35h50c0 20-10 30-25 30S25 55 25 35z M30 43h40 M50 65v15 M36 82h28 M50 15l3 8 8 3-8 3-3 8-3-8-8-3 8-3z'],
+      ['鑰匙', 'M48 29a15 15 0 1 0-30 0 15 15 0 1 0 30 0z M39 43l34 34 8-8-6-6-4 4-5-5 4-4-5-5 M33 24v10 M28 29h10'],
+      ['水晶', 'M50 15 69 39 65 66 50 85 35 66 31 39z M50 15l-9 26 9 44 9-44z M31 39l10 2h18l10-2 M21 21v12 M15 27h12 M78 65v12 M72 71h12'],
+      ['沙漏', 'M28 21h44v7H28z M28 72h44v7H28z M33 28c0 16 9 17 17 22-8 5-17 6-17 22 M67 28c0 16-9 17-17 22 8 5 17 6 17 22 M38 66l12-8 12 8z M39 36h22']
+    ].map(([name, outline]) => [name, drawImage(outline, gold)]);
+
+    const sigil = drawImage(
+      'M50 11a39 39 0 1 0 0 78a39 39 0 1 0 0-78 M50 18a32 32 0 1 0 0 64a32 32 0 1 0 0-64 M50 16 79 67H21z M50 84 21 33h58z M35 50q15-17 30 0-15 17-30 0z M50 4v7 M50 89v7 M4 50h7 M89 50h7',
+      '#edca86',
+      'M50 46a4 4 0 1 0 0 8a4 4 0 1 0 0-8'
+    );
+    const board = document.querySelector('#board');
+    const score = document.querySelector('#score');
+    const complete = document.querySelector('#complete');
+    const restart = document.querySelector('#restart');
+    let firstCard = null;
+    let pendingTurn = null;
+    let points = 0;
+
+    function showCard(card, open) {
+      card.classList.toggle('open', open);
+      card.setAttribute('aria-label', open ? card.dataset.name : card.dataset.hiddenLabel);
+    }
+
+    function flip(card) {
+      if (pendingTurn !== null || card.classList.contains('open')) return;
+
+      showCard(card, true);
+      if (!firstCard) {
+        firstCard = card;
+        return;
+      }
+
+      const previous = firstCard;
+      firstCard = null;
+      if (previous.dataset.name !== card.dataset.name) {
+        pendingTurn = setTimeout(() => {
+          showCard(previous, false);
+          showCard(card, false);
+          pendingTurn = null;
+        }, 800);
+        return;
+      }
+
+      for (const matched of [previous, card]) {
+        matched.classList.add('matched');
+        matched.setAttribute('aria-disabled', 'true');
+        matched.setAttribute('aria-label', matched.dataset.name + '，已配對');
+      }
+      points += 1;
+      score.textContent = points;
+      if (points === pictures.length) {
+        pendingTurn = setTimeout(() => {
+          pendingTurn = null;
+          complete.showModal();
+        }, 320);
+      }
+    }
+
+    function startGame(moveFocus = false) {
+      clearTimeout(pendingTurn);
+      pendingTurn = null;
+      firstCard = null;
+      points = 0;
+      score.textContent = points;
+
+      const deck = [...pictures, ...pictures];
+      for (let index = deck.length - 1; index > 0; index -= 1) {
+        const swap = Math.floor(Math.random() * (index + 1));
+        [deck[index], deck[swap]] = [deck[swap], deck[index]];
+      }
+
+      board.replaceChildren(...deck.map(([name, picture], index) => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'card';
+        card.dataset.name = name;
+        card.dataset.hiddenLabel = '第 ' + (index + 1) + ' 張牌，未翻開';
+        card.setAttribute('aria-label', card.dataset.hiddenLabel);
+        card.innerHTML = '<span class="faces" aria-hidden="true"><span class="face back"><img alt=""></span><span class="face front"><img alt=""><span></span></span></span>';
+        card.querySelector('.back img').src = sigil;
+        card.querySelector('.front img').src = picture;
+        card.querySelector('.front span').textContent = name;
+        card.addEventListener('click', () => flip(card));
+        return card;
+      }));
+      if (moveFocus) board.firstElementChild.focus();
+    }
+
+    restart.addEventListener('click', () => startGame(true));
+    document.querySelector('#replay').addEventListener('click', () => {
+      complete.close('replay');
+      startGame(true);
+    });
+    complete.addEventListener('close', () => {
+      if (complete.returnValue !== 'replay') restart.focus();
+      complete.returnValue = '';
+    });
+    startGame();
+  </script>
+</body>
+</html>
